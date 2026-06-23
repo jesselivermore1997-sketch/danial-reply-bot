@@ -7,6 +7,8 @@ GEMINI_API_KEY = "AQ.Ab8RN6KynkE1Ro6_dHOJ0Y5rixFRoOY9Yuf-w8nDKTriAhdHZQ"
 BASE_ID = "appQHRt45Wgtu0ZOc"
 INBOX_TABLE_ID = "tbls243tW39fhvMYe"
 
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={GEMINI_API_KEY}"
+
 SYSTEM_PROMPT = """You are Danial's Communication Copilot. Write replies exactly as Danial would. Never mention AI or automation. Danial is a trader, crypto educator, founder of KurdChain community, and IB for CXM broker. Reply like a friend - warm, natural, human. If Kurdish Latin input, always reply in Sorani Kurdish script. If Iraqi Arabic, reply in warm Baghdadi dialect. Max 2 emojis. If you don't know the answer, reply exactly: NEEDS DANIAL INPUT. Return only the final reply, nothing else."""
 
 def check_inbox():
@@ -25,7 +27,7 @@ def check_inbox():
         prompt = f"{SYSTEM_PROMPT}\n\nIncoming Message: {incoming}\nDanial Note: {note}\n\nWrite the reply now:"
         
         response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}",
+            GEMINI_URL,
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=60
         )
