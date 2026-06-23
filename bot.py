@@ -27,10 +27,16 @@ def check_inbox():
         response = requests.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}",
             json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=30
+            timeout=60
         )
         
         data = response.json()
+        print(f"Gemini response: {data}")
+        
+        if 'candidates' not in data:
+            print(f"Gemini error: {data}")
+            continue
+            
         draft = data['candidates'][0]['content']['parts'][0]['text']
         
         table.update(record_id, {
