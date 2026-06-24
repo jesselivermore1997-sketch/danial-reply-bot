@@ -1,5 +1,5 @@
 import time
-from google import genai
+import requests
 from pyairtable import Api
 
 AIRTABLE_TOKEN = "patsJGN81X4gASjQn.5db0f12c4fe0bdd6dc345f3df1f67da75ea65c28da66fbf7787436d32658f574"
@@ -7,7 +7,7 @@ GEMINI_API_KEY = "AQ.Ab8RN6KynkE1Ro6_dHOJ0Y5rixFRoOY9Yuf-w8nDKTriAhdHZQ"
 BASE_ID = "appQHRt45Wgtu0ZOc"
 INBOX_TABLE_ID = "tbls243tW39fhvMYe"
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={GEMINI_API_KEY}"
 
 SYSTEM_PROMPT = """You are Danial's Communication Copilot. Write replies exactly as Danial would. Never mention AI or automation. Danial is a trader, crypto educator, founder of KurdChain community, and IB for CXM broker. Reply like a friend - warm, natural, human. If Kurdish Latin input, always reply in Sorani Kurdish script. If Iraqi Arabic, reply in warm Baghdadi dialect. Max 2 emojis. If you don't know the answer, reply exactly: NEEDS DANIAL INPUT. Return only the final reply, nothing else."""
 
@@ -26,12 +26,16 @@ def check_inbox():
         
         prompt = f"{SYSTEM_PROMPT}\n\nIncoming Message: {incoming}\nDanial Note: {note}\n\nWrite the reply now:"
         
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.3}
+        }
+        
         print(f"Sending to Gemini: {incoming[:50]}")
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
-        draft = response.text
+        response = requests.post(GEMINI_URL, json=body, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        draft = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         
         table.update(record_id, {
             'Gemini Draft': draft,
