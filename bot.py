@@ -10,6 +10,8 @@ BASE_ID = "appQHRt45Wgtu0ZOc"
 INBOX_TABLE_ID = "tbls243tW39fhvMYe"
 KB_TABLE_ID = "tbl2BfNIjKLinkZlE"
 
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
+
 SYSTEM_PROMPT = """You are Danial's Communication Copilot. Write replies exactly as Danial would. Never mention AI or automation. Danial is a trader, crypto educator, founder of KurdChain community, and IB for CXM broker. Reply like a friend - warm, natural, human. If Kurdish Latin input, always reply in Sorani Kurdish script. If Iraqi Arabic, reply in warm Baghdadi dialect. Max 2 emojis. If you don't know the answer, reply exactly: NEEDS DANIAL INPUT. Return only the final reply, nothing else."""
 
 def signal_handler(sig, frame):
@@ -35,6 +37,23 @@ def get_knowledge_base():
         print(f"KB error: {e}")
         return ""
 
+def call_gemini(prompt_text, retries=3, wait=10):
+    body = {
+        "contents": [{"parts": [{"text": prompt_text}]}],
+        "generationConfig": {"temperature": 0.3}
+    }
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.post(GEMINI_URL, json=body, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except Exception as e:
+            print(f"Attempt {attempt}/{retries} failed: {e}")
+            if attempt < retries:
+                time.sleep(wait)
+    raise Exception("All attempts failed.")
+
 def check_inbox():
     api = Api(AIRTABLE_TOKEN)
     table = api.table(BASE_ID, INBOX_TABLE_ID)
@@ -56,27 +75,15 @@ def check_inbox():
 
         prompt = f"{SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n{knowledge}\n\nIncoming Message: {incoming}\nDanial Note: {note}\n\nWrite the reply now:"
 
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=60
-        )
-
-        data = response.json()
-        print(f"Gemini response: {data}")
-
-        if 'candidates' not in data:
-            print(f"Gemini error: {data}")
-            continue
-
-        draft = data['candidates'][0]['content']['parts'][0]['text']
-
-        table.update(record_id, {
-            'Gemini Draft': draft,
-            'Status': '2. Review'
-        })
-
-        print(f"✅ Processed: {incoming[:50]}")
+        try:
+            draft = call_gemini(prompt)
+            table.update(record_id, {
+                'Gemini Draft': draft,
+                'Status': '2. Review'
+            })
+            print(f"✅ Processed: {incoming[:50]}")
+        except Exception as e:
+            print(f"❌ Failed: {e}")
 
 print("🤖 Danial Reply Bot started!")
 while True:
