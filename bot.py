@@ -1,6 +1,8 @@
 import time
 import requests
 from pyairtable import Api
+import signal
+import sys
 
 AIRTABLE_TOKEN = "patsJGN81X4gASjQn.5db0f12c4fe0bdd6dc345f3df1f67da75ea65c28da66fbf7787436d32658f574"
 GEMINI_API_KEY = "AQ.Ab8RN6KPU3FQJyuU55owbAlVZdbBBiHDF8RZtYKVKFMBXlLOvg"
@@ -10,23 +12,34 @@ KB_TABLE_ID = "tbl2BfNIjKLinkZlE"
 
 SYSTEM_PROMPT = """You are Danial's Communication Copilot. Write replies exactly as Danial would. Never mention AI or automation. Danial is a trader, crypto educator, founder of KurdChain community, and IB for CXM broker. Reply like a friend - warm, natural, human. If Kurdish Latin input, always reply in Sorani Kurdish script. If Iraqi Arabic, reply in warm Baghdadi dialect. Max 2 emojis. If you don't know the answer, reply exactly: NEEDS DANIAL INPUT. Return only the final reply, nothing else."""
 
+def signal_handler(sig, frame):
+    print("Bot stopped.")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
 def get_knowledge_base():
-    api = Api(AIRTABLE_TOKEN)
-    table = api.table(BASE_ID, KB_TABLE_ID)
-    records = table.all()
-    knowledge = ""
-    for record in records:
-        topic = record['fields'].get('Topic', '')
-        info = record['fields'].get('Information', '')
-        if topic and info:
-            knowledge += f"{topic}: {info}\n\n"
-    return knowledge
+    try:
+        api = Api(AIRTABLE_TOKEN)
+        table = api.table(BASE_ID, KB_TABLE_ID)
+        records = table.all()
+        knowledge = ""
+        for record in records:
+            topic = record['fields'].get('Topic', '')
+            info = record['fields'].get('Information', '')
+            if topic and info:
+                knowledge += f"{topic}: {info}\n\n"
+        return knowledge
+    except Exception as e:
+        print(f"KB error: {e}")
+        return ""
 
 def check_inbox():
     api = Api(AIRTABLE_TOKEN)
     table = api.table(BASE_ID, INBOX_TABLE_ID)
     records = table.all(formula="{Status}='1. Waiting for Gemini'")
-    
+
     if not records:
         print("No new messages.")
         return
@@ -57,3 +70,21 @@ def check_inbox():
             continue
 
         draft = data['candidates'][0]['content']['parts'][0]['text']
+
+        table.update(record_id, {
+            'Gemini Draft': draft,
+            'Status': '2. Review'
+        })
+
+        print(f"✅ Processed: {incoming[:50]}")
+
+print("🤖 Danial Reply Bot started!")
+while True:
+    try:
+        print("🔍 Checking inbox...")
+        check_inbox()
+        print("⏳ Sleeping 60 seconds...")
+        time.sleep(60)
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        time.sleep(60)
