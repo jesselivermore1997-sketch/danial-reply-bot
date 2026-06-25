@@ -44,7 +44,7 @@ def check_inbox():
         prompt = f"{SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n{knowledge}\n\nIncoming Message: {incoming}\nDanial Note: {note}\n\nWrite the reply now:"
 
         response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=60
         )
@@ -57,19 +57,3 @@ def check_inbox():
             continue
 
         draft = data['candidates'][0]['content']['parts'][0]['text']
-
-        table.update(record_id, {
-            'Gemini Draft': draft,
-            'Status': '2. Review'
-        })
-
-        print(f"✅ Processed: {incoming[:50]}")
-
-while True:
-    try:
-        print("🔍 Checking inbox...")
-        check_inbox()
-        print("⏳ Waiting 60 seconds...")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-    time.sleep(60)
