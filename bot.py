@@ -90,8 +90,8 @@ while True:
     try:
         print("🔍 Checking inbox...")
         check_inbox()
-        print("⏳ Sleeping 60 seconds...")
-        time.sleep(60)
+        print("⏳ Sleeping 10 seconds...")
+        time.sleep(10)
     except Exception as e:
         print(f"❌ Error: {e}")
-        time.sleep(60)
+        time.sleep(10)
