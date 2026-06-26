@@ -1,25 +1,28 @@
+import asyncio
 import time
 import requests
 from pyairtable import Api
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 import signal
 import sys
 
+# ── Credentials ──
 AIRTABLE_TOKEN = "patohYM4S7UIG2xM5.45ee82250de865ae8174bedbc8f6d60aa99bb192fe3d22378af34a03d778cb62"
 GEMINI_API_KEY = "AQ.Ab8RN6ITU4MsYziTZRYcIx-kXkT6tgL3TPT6XzpzTJ-X3-C2iA"
 BASE_ID = "appQHRt45Wgtu0ZOc"
 INBOX_TABLE_ID = "tbls243tW39fhvMYe"
 KB_TABLE_ID = "tbl2BfNIjKLinkZlE"
 
+# ── Telegram ──
+API_ID = 33828680
+API_HASH = "11b34dc04686e99af9548b06c80ed2b0"
+SESSION_STRING = "1ApWapzMBu6AyM0-Msv-U5FwDlYnowGvDOW_N-q1htIzvc2STWDtSZHdDwvtI9iZVEj98kNW3m2FcPlRcbUn35heutNCmmBasattIIElijr8SexP3WmrTAsTGN4q9L7Bh3Gi4uezTJQ_eCoDuUqbRnF_yR5XYTNkrMVt8dYC4lKyrsgmLjnc0fgBGeZoiefTvWdQ56Y01GUArPDA6xMSEERyzqoBELPy0e7bYXbmQC3nFlgjissLfSyqNDVeUcjAnegs1h5YceTXduF-d7UmQMWFWwix8-RhIgQ0kwPZBq8zN4sCpQ1ClpgYCJtr5m92FLg2UZ58pGSRdo4NKuuSI1rRt93eHI7s="
+
+# ── Gemini ──
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
 
 SYSTEM_PROMPT = """You are Danial's Communication Copilot. Write replies exactly as Danial would. Never mention AI or automation. Danial is a trader, crypto educator, founder of KurdChain community, and IB for CXM broker. Reply like a friend - warm, natural, human. If Kurdish Latin input, always reply in Sorani Kurdish script. If Iraqi Arabic, reply in warm Baghdadi dialect. Max 2 emojis. If you don't know the answer, reply exactly: NEEDS DANIAL INPUT. Return only the final reply, nothing else."""
-
-def signal_handler(sig, frame):
-    print("Bot stopped.")
-    sys.exit(0)
-
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
 
 def get_knowledge_base():
     try:
@@ -54,44 +57,51 @@ def call_gemini(prompt_text, retries=3, wait=10):
                 time.sleep(wait)
     raise Exception("All attempts failed.")
 
-def check_inbox():
-    api = Api(AIRTABLE_TOKEN)
-    table = api.table(BASE_ID, INBOX_TABLE_ID)
-    records = table.all(formula="{Status}='1. Waiting for Gemini'")
-
-    if not records:
-        print("No new messages.")
-        return
-
-    knowledge = get_knowledge_base()
-
-    for record in records:
-        record_id = record['id']
-        incoming = record['fields'].get('Incoming Message', '')
-        note = record['fields'].get('Danial Note', '')
-
-        if not incoming:
-            continue
-
-        prompt = f"{SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n{knowledge}\n\nIncoming Message: {incoming}\nDanial Note: {note}\n\nWrite the reply now:"
-
+def save_to_airtable(sender_name, sender_id, message_text, platform="Telegram"):
+    try:
+        api = Api(AIRTABLE_TOKEN)
+        table = api.table(BASE_ID, INBOX_TABLE_ID)
+        
+        knowledge = get_knowledge_base()
+        prompt = f"{SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n{knowledge}\n\nIncoming Message: {message_text}\nDanial Note: \n\nWrite the reply now:"
+        
         try:
             draft = call_gemini(prompt)
-            table.update(record_id, {
-                'Gemini Draft': draft,
-                'Status': '2. Review'
-            })
-            print(f"✅ Processed: {incoming[:50]}")
-        except Exception as e:
-            print(f"❌ Failed: {e}")
-
-print("🤖 Danial Reply Bot started!")
-while True:
-    try:
-        print("🔍 Checking inbox...")
-        check_inbox()
-        print("⏳ Sleeping 10 seconds...")
-        time.sleep(10)
+            status = "2. Review"
+        except:
+            draft = "GEMINI ERROR - check manually"
+            status = "2. Review"
+        
+        table.create({
+            "Sender Name": sender_name,
+            "Chat ID": str(sender_id),
+            "Platform": platform,
+            "Incoming Message": message_text,
+            "Gemini Draft": draft,
+            "Status": status
+        })
+        print(f"✅ Saved and drafted reply for: {sender_name}")
     except Exception as e:
-        print(f"❌ Error: {e}")
-        time.sleep(10)
+        print(f"❌ Airtable error: {e}")
+
+async def main():
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+    
+    @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
+    async def handler(event):
+        sender = await event.get_sender()
+        sender_name = f"{sender.first_name or ''} {sender.last_name or ''}".strip()
+        sender_id = sender.id
+        message_text = event.message.text or ''
+        
+        if not message_text:
+            return
+        
+        print(f"📩 New DM from {sender_name}: {message_text[:50]}")
+        save_to_airtable(sender_name, sender_id, message_text)
+    
+    await client.start()
+    print("🤖 Danial Reply Bot started! Watching for DMs...")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
