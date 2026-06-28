@@ -15,7 +15,7 @@ KB_TABLE_ID = "tbl2BfNIjKLinkZlE"
 # ── Telegram ──
 API_ID = 33828680
 API_HASH = "11b34dc04686e99af9548b06c80ed2b0"
-SESSION_STRING = "1ApWapzMBu6AyM0-Msv-U5FwDlYnowGvDOW_N-q1htIzvc2STWDtSZHdDwvtI9iZVEj98kNW3m2FcPlRcbUn35heutNCmmBasattIIElijr8SexP3WmrTAsTGN4q9L7Bh3Gi4uezTJQ_eCoDuUqbRnF_yR5XYTNkrMVt8dYC4lKyrsgmLjnc0fgBGeZoiefTvWdQ56Y01GUArPDA6xMSEERyzqoBELPy0e7bYXbmQC3nFlgjissLfSyqNDVeUcjAnegs1h5YceTXduF-d7UmQMWFWwix8-RhIgQ0kwPZBq8zN4sCpQ1ClpgYCJtr5m92FLg2UZ58pGSRdo4NKuuSI1rRt93eHI7s="
+SESSION_STRING = "1ApWapzMBu1DrAwlCxzBspt_OVQ2kLGeTCXMlHDKc_tUEDMM-qzoEuTB-hWkqWrxYere7JMCh3QUoKz9miyO0vVmj_dpCvEt2WAMWxNN4DpbIm0ijmVFwaLoT_wrkluUTj8qawmcvosGUn4q-7LHp4cNdc_P9-UkHge6XDjc4vBOwo3MXLXsoOilYg1Qx0el0GHkiUIk2pxTfFTF3GuzOVs-oO-NwB-XqsXavEfjGMYq7roRzPszdVlKnqYJCVfkkcWihi2Dpt_EYqZj5sDVs5NwFnUMBpgegcpieNThznUEUYjYAHb3PqxHYMn_rCodwIKpeKFG4B22Gx6cPKzCP7FE7UuoxJdU="
 BOT_TOKEN = "8642746419:AAGsLH1qXWKNJ8gw09paVgALnqZaTnhxn9A"
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -73,50 +73,3 @@ def save_to_airtable(sender_name, sender_id, message_text, draft, platform="Tele
             "Gemini Draft": draft,
             "Status": "4. Done"
         })
-        print(f"✅ Saved to Airtable for: {sender_name}")
-    except Exception as e:
-        print(f"❌ Airtable error: {e}")
-
-async def main():
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
-    @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
-    async def handler(event):
-        try:
-            sender = await event.get_sender()
-            sender_name = f"{sender.first_name or ''} {sender.last_name or ''}".strip()
-            sender_id = sender.id
-            message_text = event.message.text or ''
-
-            if not message_text:
-                return
-
-            print(f"📩 New DM from {sender_name}: {message_text[:50]}")
-
-            knowledge = get_knowledge_base()
-            prompt = f"{SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n{knowledge}\n\nIncoming Message: {message_text}\n\nWrite the reply now:"
-
-            try:
-                draft = call_ai(prompt)
-                print(f"💬 Draft: {draft[:50]}")
-
-                if "NEEDS DANIAL INPUT" in draft:
-                    print(f"⚠️ Needs Danial input for: {sender_name}")
-                    save_to_airtable(sender_name, sender_id, message_text, draft, "Telegram")
-                else:
-                    await event.reply(draft)
-                    print(f"✅ Auto-replied to: {sender_name}")
-                    save_to_airtable(sender_name, sender_id, message_text, draft, "Telegram")
-
-            except Exception as e:
-                print(f"❌ AI Failed: {e}")
-                save_to_airtable(sender_name, sender_id, message_text, "ERROR - check manually", "Telegram")
-
-        except Exception as e:
-            print(f"❌ Handler error: {e}")
-
-    await client.start()
-    print("🤖 Danial Reply Bot started! Auto-reply mode ON...")
-    await client.run_until_disconnected()
-
-asyncio.run(main())
